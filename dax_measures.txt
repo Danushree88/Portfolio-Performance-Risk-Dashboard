@@ -1,0 +1,274 @@
+// ============================================
+// PORTFOLIO VALUATION MEASURES
+// ============================================
+
+Total Investment = 
+SUMX(
+    portfolio,
+    portfolio[Quantity] * portfolio[Buy_Price]
+)
+
+Current Value = 
+SUMX(
+    portfolio,
+    VAR StockName = portfolio[Stock]
+    VAR LatestPrice = 
+        CALCULATE(
+            MAX(NIFTY50_all[Close_Price]),
+            NIFTY50_all[Stock] = StockName,
+            LASTDATE(NIFTY50_all[Date])
+        )
+    RETURN portfolio[Quantity] * LatestPrice
+)
+
+Profit Loss = 
+[Current Value] - [Total Investment]
+
+Portfolio Return % = 
+DIVIDE(
+    [Profit Loss],
+    [Total Investment],
+    0
+) * 100
+
+
+// ============================================
+// PERFORMANCE METRICS
+// ============================================
+
+Daily Return % = 
+VAR CurrentPrice = MAX(NIFTY50_all[Close_Price])
+VAR PrevPrice = 
+    CALCULATE(
+        MAX(NIFTY50_all[Close_Price]),
+        DATEADD(NIFTY50_all[Date], -1, DAY)
+    )
+RETURN 
+DIVIDE(
+    CurrentPrice - PrevPrice,
+    PrevPrice,
+    0
+) * 100
+
+Avg Daily Return % = 
+AVERAGE(NIFTY50_all[Daily Return %])
+
+Cumulative Return % = 
+VAR FirstPrice = 
+    CALCULATE(
+        MAX(NIFTY50_all[Close_Price]),
+        FIRSTDATE(NIFTY50_all[Date])
+    )
+VAR CurrentPrice = MAX(NIFTY50_all[Close_Price])
+RETURN
+DIVIDE(
+    CurrentPrice - FirstPrice,
+    FirstPrice,
+    0
+) * 100
+
+
+// ============================================
+// RISK METRICS
+// ============================================
+
+Volatility % = 
+STDEVX.P(
+    VALUES(NIFTY50_all[Date]),
+    [Daily Return %]
+)
+
+Annualized Volatility % = 
+[Volatility %] * SQRT(252)
+
+Max Drawdown % = 
+VAR MaxPrice = 
+    CALCULATE(
+        MAX(NIFTY50_all[Close_Price]),
+        ALLSELECTED(NIFTY50_all[Date])
+    )
+VAR CurrentPrice = MAX(NIFTY50_all[Close_Price])
+RETURN
+DIVIDE(
+    CurrentPrice - MaxPrice,
+    MaxPrice,
+    0
+) * 100
+
+
+// ============================================
+// BENCHMARK COMPARISON
+// ============================================
+
+Index Return % = 
+VAR CurrentIndex = MAX(NIFTY50_Index[Index_Close])
+VAR FirstIndex = 
+    CALCULATE(
+        MAX(NIFTY50_Index[Index_Close]),
+        FIRSTDATE(NIFTY50_all[Date])
+    )
+RETURN 
+DIVIDE(
+    CurrentIndex - FirstIndex,
+    FirstIndex,
+    0
+) * 100
+
+Alpha (Outperformance) = 
+[Portfolio Return %] - [Index Return %]
+
+Beta = 
+VAR PortfolioReturns = VALUES(NIFTY50_all[Daily Return %])
+VAR IndexReturns = VALUES(NIFTY50_Index[Daily Return %])
+RETURN
+DIVIDE(
+    COVARIANCE.P(PortfolioReturns, IndexReturns),
+    VAR(IndexReturns)
+)
+
+
+// ============================================
+// VOLUME & LIQUIDITY METRICS
+// ============================================
+
+Total Volume = 
+SUM(NIFTY50_all[Volume])
+
+Avg Volume = 
+AVERAGE(NIFTY50_all[Volume])
+
+Volume Rank = 
+RANKX(
+    ALL(NIFTY50_all[Stock]),
+    [Total Volume],
+    ,
+    DESC,
+    DENSE
+)
+
+Turnover Total = 
+SUM(NIFTY50_all[Turnover])
+
+
+// ============================================
+// PRICE METRICS
+// ============================================
+
+Latest Close Price = 
+CALCULATE(
+    MAX(NIFTY50_all[Close_Price]),
+    LASTDATE(NIFTY50_all[Date])
+)
+
+Highest Price = 
+MAX(NIFTY50_all[High])
+
+Lowest Price = 
+MIN(NIFTY50_all[Low])
+
+Price Range = 
+[Highest Price] - [Lowest Price]
+
+Avg Close Price = 
+AVERAGE(NIFTY50_all[Close_Price])
+
+
+// ============================================
+// TIME-BASED METRICS
+// ============================================
+
+YTD Return % = 
+VAR YearStart = 
+    CALCULATE(
+        MAX(NIFTY50_all[Close_Price]),
+        DATESYTD(NIFTY50_all[Date])
+    )
+VAR CurrentPrice = MAX(NIFTY50_all[Close_Price])
+RETURN
+DIVIDE(
+    CurrentPrice - YearStart,
+    YearStart,
+    0
+) * 100
+
+MTD Return % = 
+VAR MonthStart = 
+    CALCULATE(
+        MAX(NIFTY50_all[Close_Price]),
+        DATESMTD(NIFTY50_all[Date])
+    )
+VAR CurrentPrice = MAX(NIFTY50_all[Close_Price])
+RETURN
+DIVIDE(
+    CurrentPrice - MonthStart,
+    MonthStart,
+    0
+) * 100
+
+30 Day Return % = 
+VAR Price30DaysAgo = 
+    CALCULATE(
+        MAX(NIFTY50_all[Close_Price]),
+        DATEADD(NIFTY50_all[Date], -30, DAY)
+    )
+VAR CurrentPrice = MAX(NIFTY50_all[Close_Price])
+RETURN
+DIVIDE(
+    CurrentPrice - Price30DaysAgo,
+    Price30DaysAgo,
+    0
+) * 100
+
+
+// ============================================
+// PORTFOLIO ALLOCATION METRICS
+// ============================================
+
+Stock Weight % = 
+VAR StockValue = [Current Value]
+VAR TotalPortfolioValue = 
+    CALCULATE(
+        [Current Value],
+        ALL(portfolio)
+    )
+RETURN
+DIVIDE(
+    StockValue,
+    TotalPortfolioValue,
+    0
+) * 100
+
+Number of Stocks = 
+DISTINCTCOUNT(portfolio[Stock])
+
+Avg Position Size = 
+DIVIDE(
+    [Total Investment],
+    [Number of Stocks],
+    0
+)
+
+
+// ============================================
+// CONDITIONAL FORMATTING MEASURES
+// ============================================
+
+Return Color = 
+IF(
+    [Portfolio Return %] > 0,
+    "Green",
+    IF(
+        [Portfolio Return %] < 0,
+        "Red",
+        "Gray"
+    )
+)
+
+Risk Level = 
+SWITCH(
+    TRUE(),
+    [Volatility %] < 5, "Low",
+    [Volatility %] < 10, "Medium",
+    [Volatility %] >= 10, "High",
+    "Unknown"
+)
